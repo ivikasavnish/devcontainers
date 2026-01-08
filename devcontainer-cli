@@ -1,0 +1,221 @@
+#!/bin/bash
+# DevContainer CLI - Unified command-line interface
+# Usage: devcontainer-cli [command] [options]
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+show_help() {
+    cat << EOF
+DevContainer CLI - Intelligent Development Container Manager
+
+USAGE:
+    devcontainer-cli <command> [options]
+
+COMMANDS:
+    auto [path]              Auto-detect and setup devcontainer
+    build [path]             Build devcontainer (Python interface)
+    install <stack> <path>   Install specific stack
+    list                     List available stacks
+    detect <path>            Detect project type only
+    open <path>              Open project in VS Code container
+    remove <path>            Remove devcontainer from project
+    
+OPTIONS:
+    -h, --help              Show this help message
+    -v, --version           Show version
+    
+STACKS:
+    rails                   Ruby on Rails + PostgreSQL + Redis
+    strapi                  Strapi CMS + PostgreSQL  
+    go-react                Go + React + PostgreSQL + Redis
+    rails-react             Rails API + React + PostgreSQL + Redis
+    python                  Python + PostgreSQL + Redis
+
+EXAMPLES:
+    # Auto-detect and install
+    devcontainer-cli auto /path/to/project
+    
+    # Force specific stack
+    devcontainer-cli install rails /path/to/project
+    
+    # Detect only (no installation)
+    devcontainer-cli detect /path/to/project
+    
+    # List available stacks
+    devcontainer-cli list
+    
+    # Open in VS Code
+    devcontainer-cli open /path/to/project
+
+DOCUMENTATION:
+    Main Guide:       $SCRIPT_DIR/README.md
+    Quick Reference:  $SCRIPT_DIR/QUICK-REFERENCE.md
+    
+EOF
+}
+
+cmd_auto() {
+    "$SCRIPT_DIR/auto-detect.sh" "${1:-.}"
+}
+
+cmd_build() {
+    if ! command -v python3 &> /dev/null; then
+        echo "❌ Python 3 is required for the builder"
+        echo "   Using bash auto-detect instead..."
+        cmd_auto "$@"
+        return
+    fi
+    
+    python3 "$SCRIPT_DIR/devcontainer-builder.py" "$@"
+}
+
+cmd_install() {
+    if [ -z "$1" ] || [ -z "$2" ]; then
+        echo "Usage: devcontainer-cli install <stack> <path>"
+        echo ""
+        echo "Available stacks: rails, strapi, go-react, rails-react, python"
+        exit 1
+    fi
+    
+    "$SCRIPT_DIR/setup-devcontainer.sh" "$1" "$2"
+}
+
+cmd_list() {
+    cat << EOF
+📦 Available DevContainer Stacks:
+
+1. rails
+   • Ruby 3.3 + Rails + PostgreSQL + Redis
+   • Ports: 3000, 5432
+   • Use: Full-stack Rails applications
+
+2. strapi
+   • Node.js 20 + Strapi CMS + PostgreSQL
+   • Ports: 1337, 5432
+   • Use: Headless CMS projects
+
+3. go-react
+   • Go 1.22 + Node.js 20 + PostgreSQL + Redis
+   • Ports: 8080, 3000, 5432
+   • Use: Go backend with React frontend
+
+4. rails-react
+   • Ruby 3.3 + Node.js 20 + PostgreSQL + Redis
+   • Ports: 3000, 3001, 5432
+   • Use: Rails API with React frontend
+
+5. python
+   • Python 3.12 + PostgreSQL + Redis
+   • Ports: 8000, 5432, 6379
+   • Use: FastAPI, Django, Flask applications
+
+EOF
+}
+
+cmd_detect() {
+    PROJECT_DIR="${1:-.}"
+    
+    if command -v python3 &> /dev/null; then
+        python3 "$SCRIPT_DIR/devcontainer-builder.py" "$PROJECT_DIR" --dry-run
+    else
+        # Fallback to bash detection
+        echo "🔍 Detecting project type in: $PROJECT_DIR"
+        "$SCRIPT_DIR/auto-detect.sh" "$PROJECT_DIR" < <(echo "n")
+    fi
+}
+
+cmd_open() {
+    PROJECT_DIR="${1:-.}"
+    
+    if [ ! -d "$PROJECT_DIR/.devcontainer" ]; then
+        echo "❌ No devcontainer found in $PROJECT_DIR"
+        echo ""
+        read -p "   Would you like to set one up? (Y/n): " -r
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            cmd_auto "$PROJECT_DIR"
+            return
+        fi
+        exit 1
+    fi
+    
+    if ! command -v code &> /dev/null; then
+        echo "❌ VS Code CLI not found"
+        echo "   Install from: https://code.visualstudio.com/"
+        exit 1
+    fi
+    
+    echo "🚀 Opening $PROJECT_DIR in VS Code..."
+    code "$PROJECT_DIR"
+}
+
+cmd_remove() {
+    PROJECT_DIR="${1:-.}"
+    DEVCONTAINER_PATH="$PROJECT_DIR/.devcontainer"
+    
+    if [ ! -d "$DEVCONTAINER_PATH" ]; then
+        echo "❌ No devcontainer found in $PROJECT_DIR"
+        exit 1
+    fi
+    
+    echo "⚠️  This will remove the devcontainer from:"
+    echo "   $DEVCONTAINER_PATH"
+    echo ""
+    read -p "   Are you sure? (y/N): " -r
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm -rf "$DEVCONTAINER_PATH"
+        echo "✅ DevContainer removed"
+    else
+        echo "❌ Aborted"
+    fi
+}
+
+# Main command dispatcher
+COMMAND="${1:-}"
+
+case "$COMMAND" in
+    auto)
+        shift
+        cmd_auto "$@"
+        ;;
+    build)
+        shift
+        cmd_build "$@"
+        ;;
+    install|setup)
+        shift
+        cmd_install "$@"
+        ;;
+    list|ls)
+        cmd_list
+        ;;
+    detect)
+        shift
+        cmd_detect "$@"
+        ;;
+    open)
+        shift
+        cmd_open "$@"
+        ;;
+    remove|rm)
+        shift
+        cmd_remove "$@"
+        ;;
+    -h|--help|help)
+        show_help
+        ;;
+    -v|--version)
+        echo "DevContainer CLI v1.0.0"
+        ;;
+    "")
+        show_help
+        ;;
+    *)
+        echo "❌ Unknown command: $COMMAND"
+        echo ""
+        show_help
+        exit 1
+        ;;
+esac
