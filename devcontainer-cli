@@ -5,6 +5,26 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_URL="https://github.com/ivikasavnish/devcontainers"
+
+# Check if running from installed location or needs remote fetch
+ensure_templates() {
+    # If templates exist locally, use them
+    if [ -d "$SCRIPT_DIR/rails" ]; then
+        return 0
+    fi
+    
+    # Download templates if not available
+    echo "📦 Fetching templates from GitHub..."
+    TEMP_DIR=$(mktemp -d)
+    
+    if ! curl -sL "$REPO_URL/archive/refs/heads/main.tar.gz" | tar xz -C "$TEMP_DIR"; then
+        echo "❌ Failed to download templates"
+        exit 1
+    fi
+    
+    SCRIPT_DIR="$TEMP_DIR/devcontainers-main"
+}
 
 show_help() {
     cat << EOF
@@ -57,10 +77,12 @@ EOF
 }
 
 cmd_auto() {
+    ensure_templates
     "$SCRIPT_DIR/auto-detect.sh" "${1:-.}"
 }
 
 cmd_build() {
+    ensure_templates
     if ! command -v python3 &> /dev/null; then
         echo "❌ Python 3 is required for the builder"
         echo "   Using bash auto-detect instead..."
@@ -72,6 +94,7 @@ cmd_build() {
 }
 
 cmd_install() {
+    ensure_templates
     if [ -z "$1" ] || [ -z "$2" ]; then
         echo "Usage: devcontainer-cli install <stack> <path>"
         echo ""
@@ -115,6 +138,7 @@ EOF
 }
 
 cmd_detect() {
+    ensure_templates
     PROJECT_DIR="${1:-.}"
     
     if command -v python3 &> /dev/null; then

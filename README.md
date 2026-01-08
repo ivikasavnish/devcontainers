@@ -1,17 +1,22 @@
-# DevContainer Templates
+# DevContainer Templates & CLI
 
-Drop-in development container configurations for various tech stacks with **intelligent auto-detection**. Just run one command and start coding!
+A collection of production-ready DevContainer templates and an intelligent CLI for automating development environment setup.
 
-## 🎯 Quick Start (NEW!)
+## 🚀 Quick Start
 
 ```bash
-# Auto-detect project and setup devcontainer
-~/devcontainers/devcontainer-cli auto /path/to/project
+# Install CLI
+curl -fsSL https://raw.githubusercontent.com/ivikasavnish/devcontainers/main/devcontainer-cli -o /usr/local/bin/devcontainer
+chmod +x /usr/local/bin/devcontainer
 
-# That's it! Opens in VS Code and you're ready to code.
+# Auto-detect and setup your project
+devcontainer auto /path/to/your/project
+
+# Or install a specific stack
+devcontainer install rails /path/to/your/project
 ```
 
-## Available Stacks
+## 📦 Available Stacks
 
 ### 1. Rails
 **Path:** `rails/.devcontainer/`  
